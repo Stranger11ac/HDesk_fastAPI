@@ -3,6 +3,7 @@ import psycopg2.extras
 from settings import settings
 
 def get_connection():
+    print("✅ Connecting to database...")
     return psycopg2.connect(
         host=settings.db_host,
         user=settings.db_user,

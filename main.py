@@ -47,6 +47,7 @@ def login(data: LogupRequest):
         cur.close()
         conn.close()
 
+
 @app.post("/api/SIIGAA/Auth/Token")
 def login(data: LoginRequest):
     conn = get_connection()
@@ -62,7 +63,7 @@ def login(data: LoginRequest):
 
     user = cur.fetchone()
     if not user:
-        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+        return JSONResponse(status_code=401, detail="Credenciales inválidas")
 
     payload = {
         "Username": user["username"],
@@ -91,6 +92,7 @@ def login(data: LoginRequest):
         "refreshToken": refresh
     }
 
+
 @app.get("/api/SIIGAA/Auth/CheckToken")
 def check_token(authorization: str = Header(None)):
     if not authorization:
@@ -110,6 +112,7 @@ def check_token(authorization: str = Header(None)):
     except:
         return {"valid": False}
 
+
 @app.post("/api/SIIGAA/Auth/RefreshToken")
 def refresh_token(data: RefreshRequest):
     conn = get_connection()
@@ -124,7 +127,7 @@ def refresh_token(data: RefreshRequest):
         token_row = cur.fetchone()
 
         if not token_row:
-            raise HTTPException(status_code=401, detail="Refresh token inválido o expirado")
+            return JSONResponse(status_code=401, detail="Refresh token inválido o expirado")
 
         # 2️⃣ Decodificar con python-jose (MISMA LIBRERÍA)
         payload = jwt.decode(
@@ -166,12 +169,71 @@ def refresh_token(data: RefreshRequest):
         }
 
     except ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Refresh token expirado")
+        return JSONResponse(status_code=401, detail="Refresh token expirado")
 
     except JWTError:
-        raise HTTPException(status_code=401, detail="Refresh token inválido")
+        return JSONResponse(status_code=401, detail="Refresh token inválido")
 
     finally:
         cur.close()
         conn.close()
 
+
+@app.get("/api/HDesk/Solicitudes/ObtenerSolicitudes/{pagina}/{tamanio}")
+def obtener_solicitudes( pagina: int, tamanio: int, Busqueda: str = "", authorization: str = Header(None) ):
+    # try:
+    #     payload = jwt.decode(
+    #         authorization.replace("Bearer ", ""),
+    #         SECRET_KEY,
+    #         algorithms=[ALGORITHM]
+    #     )
+    # except:
+    #     return {"datos": [], "totalRegistros": 0}
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        offset = (pagina - 1) * tamanio
+        search = f"%{Busqueda.lower()}%"
+
+        # 🔢 total de registros (con filtro)
+        cur.execute("""
+            SELECT COUNT(*) AS total
+            FROM solicitudes
+            WHERE
+                LOWER(estatus_desc) LIKE %s OR
+                LOWER(nombre_empleado_registro) LIKE %s OR
+                LOWER(descripcion) LIKE %s OR
+                LOWER(tipo_solicitud_desc) LIKE %s OR
+                LOWER(nombre_empleado_atendio) LIKE %s OR
+                LOWER(folio) LIKE %s
+        """, (search, search, search, search, search, search))
+
+        total = cur.fetchone()["total"]
+
+        # 📄 datos paginados
+        cur.execute("""
+            SELECT *
+            FROM solicitudes
+            WHERE
+                LOWER(estatus_desc) LIKE %s OR
+                LOWER(nombre_empleado_registro) LIKE %s OR
+                LOWER(descripcion) LIKE %s OR
+                LOWER(tipo_solicitud_desc) LIKE %s OR
+                LOWER(nombre_empleado_atendio) LIKE %s OR
+                LOWER(folio) LIKE %s
+            ORDER BY solicitud_id ASC
+            LIMIT %s OFFSET %s
+        """, (search, search, search, search, search, search, tamanio, offset))
+
+        datos = cur.fetchall()
+
+        return {
+            "datos": datos,
+            "totalRegistros": total
+        }
+
+    finally:
+        cur.close()
+        conn.close()

@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta
 from jose import jwt
 
-SECRET_KEY = "DEV_SECRET_KEY"
+from settings import settings
+
+SECRET_KEY = settings.secret_key.strip()
 ALGORITHM = "HS256"
 
 def create_token(payload: dict, minutes: int):

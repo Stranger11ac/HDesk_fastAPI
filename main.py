@@ -10,14 +10,15 @@ import hashlib
 from auth import create_token
 from settings import settings
 from database import get_connection
+from functions import map_solicitud
 from models import LogupRequest, LoginRequest, RefreshRequest
 
 app = FastAPI()
 
 ACCESS_MINUTES = 5
-REFRESH_MINUTES = 60 * 24 * 7
-SECRET_KEY = settings.secret_key
 ALGORITHM = "HS256"
+REFRESH_MINUTES = 60 * 24 * 7
+SECRET_KEY = settings.secret_key.strip()
 
 app.add_middleware(
     CORSMiddleware,
@@ -127,7 +128,7 @@ def refresh_token(data: RefreshRequest):
         token_row = cur.fetchone()
 
         if not token_row:
-            return JSONResponse(status_code=401, detail="Refresh token inválido o expirado")
+            raise HTTPException(status_code=401, detail="Refresh token inválido o expirado")
 
         # 2️⃣ Decodificar con python-jose (MISMA LIBRERÍA)
         payload = jwt.decode(
@@ -146,10 +147,10 @@ def refresh_token(data: RefreshRequest):
         new_refresh = create_token(new_payload, REFRESH_MINUTES)
 
         # 3️⃣ (opcional pero recomendado) invalidar refresh viejo
-        cur.execute(
-            "DELETE FROM refresh_tokens WHERE id=%s",
-            (token_row["id"],)
-        )
+        # cur.execute(
+        #     "DELETE FROM refresh_tokens WHERE id=%s",
+        #     (token_row["id"],)
+        # )
 
         # 4️⃣ Guardar nuevo refresh
         cur.execute("""
@@ -169,10 +170,10 @@ def refresh_token(data: RefreshRequest):
         }
 
     except ExpiredSignatureError:
-        return JSONResponse(status_code=401, detail="Refresh token expirado")
+        raise HTTPException(status_code=401, detail="Refresh token expirado")
 
     except JWTError:
-        return JSONResponse(status_code=401, detail="Refresh token inválido")
+        raise HTTPException(status_code=401, detail="Refresh token inválido")
 
     finally:
         cur.close()
@@ -181,15 +182,6 @@ def refresh_token(data: RefreshRequest):
 
 @app.get("/api/HDesk/Solicitudes/ObtenerSolicitudes/{pagina}/{tamanio}")
 def obtener_solicitudes( pagina: int, tamanio: int, Busqueda: str = "", authorization: str = Header(None) ):
-    # try:
-    #     payload = jwt.decode(
-    #         authorization.replace("Bearer ", ""),
-    #         SECRET_KEY,
-    #         algorithms=[ALGORITHM]
-    #     )
-    # except:
-    #     return {"datos": [], "totalRegistros": 0}
-
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -197,7 +189,6 @@ def obtener_solicitudes( pagina: int, tamanio: int, Busqueda: str = "", authoriz
         offset = (pagina - 1) * tamanio
         search = f"%{Busqueda.lower()}%"
 
-        # 🔢 total de registros (con filtro)
         cur.execute("""
             SELECT COUNT(*) AS total
             FROM solicitudes
@@ -208,7 +199,7 @@ def obtener_solicitudes( pagina: int, tamanio: int, Busqueda: str = "", authoriz
                 LOWER(tipo_solicitud_desc) LIKE %s OR
                 LOWER(nombre_empleado_atendio) LIKE %s OR
                 LOWER(folio) LIKE %s
-        """, (search, search, search, search, search, search))
+        """, (search,)*6)
 
         total = cur.fetchone()["total"]
 
@@ -225,12 +216,13 @@ def obtener_solicitudes( pagina: int, tamanio: int, Busqueda: str = "", authoriz
                 LOWER(folio) LIKE %s
             ORDER BY solicitud_id ASC
             LIMIT %s OFFSET %s
-        """, (search, search, search, search, search, search, tamanio, offset))
+        """, (search,)*6 + (tamanio, offset))
 
-        datos = cur.fetchall()
+        rows = cur.fetchall()
+        datos_transformados = [map_solicitud(row) for row in rows]
 
         return {
-            "datos": datos,
+            "datos": datos_transformados,
             "totalRegistros": total
         }
 

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import psycopg2
 import hashlib
 # uvicorn main:app --host 127.0.0.1 --port 8080 --reload
-from auth import create_token
+from auth import create_token, get_payload_from_bearer
 from settings import settings
 from database import get_connection
 from functions import map_solicitud
@@ -192,21 +192,9 @@ def obtener_solicitudes( pagina: int, tamanio: int, Busqueda: str = "", authoriz
         offset = (pagina - 1) * tamanio
         search = f"%{Busqueda.lower()}%"
 
-        cur.execute("""
-            SELECT COUNT(*) AS total
-            FROM solicitudes
-            WHERE
-                LOWER(estatus_desc) LIKE %s OR
-                LOWER(nombre_empleado_registro) LIKE %s OR
-                LOWER(descripcion) LIKE %s OR
-                LOWER(tipo_solicitud_desc) LIKE %s OR
-                LOWER(nombre_empleado_atendio) LIKE %s OR
-                LOWER(folio) LIKE %s
-        """, (search,)*6)
-
+        cur.execute(""" SELECT COUNT(*) AS total FROM solicitudes """)
         total = cur.fetchone()["total"]
 
-        # 📄 datos paginados
         cur.execute("""
             SELECT *
             FROM solicitudes
@@ -313,14 +301,32 @@ def obtener_solicitudes_v2( pagina: int, tamanio: int, Busqueda: str = "", estat
 
 @app.get("/api/HDesk/Solicitudes/ObtenerSolicitudAceptadasTecnico")
 def obtener_solicitudes_tecnico(authorization: str = Header(None)):
-    if not authorization:
-        return {"valid": False}
+    payload = get_payload_from_bearer(authorization)
+
+    username = payload.get("Username")
+    if not username:
+        raise HTTPException(status_code=401, detail="Token missing Username")
 
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
-        cur.execute(""" SELECT * FROM solicitudes WHERE estatus_id = 3 """)
+        cur.execute(" SELECT id FROM users WHERE username = %s AND active = true ", (username,))
+
+        user = cur.fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user_id = user["id"]
+
+        cur.execute("""
+            SELECT *
+            FROM solicitudes
+            WHERE estatus_id = 3
+              AND empleado_atendio_id = %s
+            ORDER BY solicitud_id ASC
+        """, (user_id,))
+
         rows = cur.fetchall()
         datos_transformados = [map_solicitud(row) for row in rows]
 
@@ -329,3 +335,4 @@ def obtener_solicitudes_tecnico(authorization: str = Header(None)):
     finally:
         cur.close()
         conn.close()
+

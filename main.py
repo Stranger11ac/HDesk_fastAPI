@@ -1,6 +1,6 @@
 from jose import jwt, JWTError, ExpiredSignatureError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, Query, HTTPException
 from psycopg2.extras import RealDictCursor
 from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta
@@ -181,7 +181,9 @@ def refresh_token(data: RefreshRequest):
 
 
 @app.get("/api/HDesk/Solicitudes/ObtenerSolicitudes/{pagina}/{tamanio}")
-def obtener_solicitudes( pagina: int, tamanio: int, Busqueda: str = "", authorization: str = Header(None) ):
+def obtener_solicitudes( pagina: int, tamanio: int, Busqueda: str = "", authorization: str = Header(None)):
+    if not authorization:
+        return {"valid": False}
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -217,6 +219,94 @@ def obtener_solicitudes( pagina: int, tamanio: int, Busqueda: str = "", authoriz
             ORDER BY solicitud_id ASC
             LIMIT %s OFFSET %s
         """, (search,)*6 + (tamanio, offset))
+
+        rows = cur.fetchall()
+        datos_transformados = [map_solicitud(row) for row in rows]
+
+        return {
+            "datos": datos_transformados,
+            "totalRegistros": total
+        }
+
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/api/HDesk/Solicitudes/ObtenerSolicitudesV2/{pagina}/{tamanio}")
+def obtener_solicitudes_v2( pagina: int, tamanio: int, Busqueda: str = "", estatus_id: int = Query(None, alias="filter.EstatusId"), authorization: str = Header(None)):
+    if not authorization:
+        return {"valid": False}
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        offset = (pagina - 1) * tamanio
+        search = f"%{Busqueda.lower()}%"
+
+        # 🔎 Query total (con filtro de estatus)
+        cur.execute("""
+            SELECT COUNT(*) AS total
+            FROM solicitudes
+            WHERE
+                (%s IS NULL OR estatus_id = %s)
+                AND (
+                    LOWER(estatus_desc) LIKE %s OR
+                    LOWER(nombre_empleado_registro) LIKE %s OR
+                    LOWER(descripcion) LIKE %s OR
+                    LOWER(tipo_solicitud_desc) LIKE %s OR
+                    LOWER(nombre_empleado_atendio) LIKE %s OR
+                    LOWER(folio) LIKE %s
+                )
+        """, (estatus_id, estatus_id) + (search,) * 6)
+
+        total = cur.fetchone()["total"]
+
+        # 📄 Query datos paginados (con filtro de estatus)
+        cur.execute("""
+            SELECT *
+            FROM solicitudes
+            WHERE
+                (%s IS NULL OR estatus_id = %s)
+                AND (
+                    LOWER(estatus_desc) LIKE %s OR
+                    LOWER(nombre_empleado_registro) LIKE %s OR
+                    LOWER(descripcion) LIKE %s OR
+                    LOWER(tipo_solicitud_desc) LIKE %s OR
+                    LOWER(nombre_empleado_atendio) LIKE %s OR
+                    LOWER(folio) LIKE %s
+                )
+            ORDER BY solicitud_id ASC
+            LIMIT %s OFFSET %s
+        """, (estatus_id, estatus_id) + (search,) * 6 + (tamanio, offset))
+
+        rows = cur.fetchall()
+        datos_transformados = [map_solicitud(row) for row in rows]
+
+        return {
+            "datos": datos_transformados,
+            "totalRegistros": total
+        }
+
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/api/HDesk/Solicitudes/ObtenerSolicitudAceptadasTecnico")
+def obtener_solicitudes_tecnico(authorization: str = Header(None)):
+    if not authorization:
+        return {"valid": False}
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        cur.execute(""" SELECT COUNT(*) AS total FROM solicitudes WHERE estatus_id = 3 """)
+        total = cur.fetchone()["total"]
+
+        cur.execute(""" SELECT * FROM solicitudes WHERE estatus_id = 3 """)
 
         rows = cur.fetchall()
         datos_transformados = [map_solicitud(row) for row in rows]

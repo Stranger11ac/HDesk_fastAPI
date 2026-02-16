@@ -69,9 +69,9 @@ def login(data: LoginRequest):
     payload = {
         "Username": user["username"],
         "nameid": user["fullname"],
-        "role": user["role"]
+        "role": user["role"],
+        "type": "access"
     }
-
     token = create_token(payload, ACCESS_MINUTES)
     refresh = create_token(payload, REFRESH_MINUTES)
 
@@ -140,7 +140,8 @@ def refresh_token(data: RefreshRequest):
         new_payload = {
             "Username": payload["Username"],
             "nameid": payload["nameid"],
-            "role": payload["role"]
+            "role": payload["role"],
+            "type": "refresh"
         }
 
         new_token = create_token(new_payload, ACCESS_MINUTES)
@@ -245,7 +246,6 @@ def obtener_solicitudes_v2( pagina: int, tamanio: int, Busqueda: str = "", estat
         offset = (pagina - 1) * tamanio
         search = f"%{Busqueda.lower()}%"
 
-        # 🔎 Query total (con filtro de estatus)
         cur.execute("""
             SELECT COUNT(*) AS total
             FROM solicitudes
@@ -263,23 +263,40 @@ def obtener_solicitudes_v2( pagina: int, tamanio: int, Busqueda: str = "", estat
 
         total = cur.fetchone()["total"]
 
-        # 📄 Query datos paginados (con filtro de estatus)
-        cur.execute("""
-            SELECT *
-            FROM solicitudes
-            WHERE
-                (%s IS NULL OR estatus_id = %s)
-                AND (
-                    LOWER(estatus_desc) LIKE %s OR
-                    LOWER(nombre_empleado_registro) LIKE %s OR
-                    LOWER(descripcion) LIKE %s OR
-                    LOWER(tipo_solicitud_desc) LIKE %s OR
-                    LOWER(nombre_empleado_atendio) LIKE %s OR
-                    LOWER(folio) LIKE %s
-                )
-            ORDER BY solicitud_id ASC
-            LIMIT %s OFFSET %s
-        """, (estatus_id, estatus_id) + (search,) * 6 + (tamanio, offset))
+        if tamanio > 0:
+            cur.execute("""
+                SELECT *
+                FROM solicitudes
+                WHERE
+                    (%s IS NULL OR estatus_id = %s)
+                    AND (
+                        LOWER(estatus_desc) LIKE %s OR
+                        LOWER(nombre_empleado_registro) LIKE %s OR
+                        LOWER(descripcion) LIKE %s OR
+                        LOWER(tipo_solicitud_desc) LIKE %s OR
+                        LOWER(nombre_empleado_atendio) LIKE %s OR
+                        LOWER(folio) LIKE %s
+                    )
+                ORDER BY solicitud_id ASC
+                LIMIT %s OFFSET %s
+            """, (estatus_id, estatus_id) + (search,) * 6 + (tamanio, offset))
+        else:
+            cur.execute("""
+                SELECT *
+                FROM solicitudes
+                WHERE
+                    (%s IS NULL OR estatus_id = %s)
+                    AND (
+                        LOWER(estatus_desc) LIKE %s OR
+                        LOWER(nombre_empleado_registro) LIKE %s OR
+                        LOWER(descripcion) LIKE %s OR
+                        LOWER(tipo_solicitud_desc) LIKE %s OR
+                        LOWER(nombre_empleado_atendio) LIKE %s OR
+                        LOWER(folio) LIKE %s
+                    )
+                ORDER BY solicitud_id ASC
+            """, (estatus_id, estatus_id) + (search,) * 6)
+
 
         rows = cur.fetchall()
         datos_transformados = [map_solicitud(row) for row in rows]
@@ -303,18 +320,11 @@ def obtener_solicitudes_tecnico(authorization: str = Header(None)):
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
-        cur.execute(""" SELECT COUNT(*) AS total FROM solicitudes WHERE estatus_id = 3 """)
-        total = cur.fetchone()["total"]
-
         cur.execute(""" SELECT * FROM solicitudes WHERE estatus_id = 3 """)
-
         rows = cur.fetchall()
         datos_transformados = [map_solicitud(row) for row in rows]
 
-        return {
-            "datos": datos_transformados,
-            "totalRegistros": total
-        }
+        return {"data": datos_transformados}
 
     finally:
         cur.close()

@@ -374,10 +374,10 @@ def obtiene_solicitud_id( statusid: int, authorization: str = Header(None)):
 
     try:
         cur.execute("""SELECT * FROM solicitudes WHERE solicitud_id = %s""", (statusid,))
-        rows = cur.fetchall()
-        datos_transformados = [map_solicitud(row) for row in rows]
+        row = cur.fetchone()
+        request = map_solicitud(row)
 
-        return datos_transformados
+        return request
 
     finally:
         cur.close()

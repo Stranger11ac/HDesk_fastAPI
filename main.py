@@ -362,3 +362,23 @@ def obtener_tipo_solicitud(authorization: str = Header(None)):
     finally:
         cur.close()
         conn.close()
+
+
+@app.get("/api/HDesk/Solicitudes/ObtieneSolicitud/{statusid}")
+def obtiene_solicitud_id( statusid: int, authorization: str = Header(None)):
+    if not authorization:
+        return {"valid": False}
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        cur.execute("""SELECT * FROM solicitudes WHERE solicitud_id = %s""", (statusid,))
+        rows = cur.fetchall()
+        datos_transformados = [map_solicitud(row) for row in rows]
+
+        return datos_transformados
+
+    finally:
+        cur.close()
+        conn.close()

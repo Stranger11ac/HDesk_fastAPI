@@ -330,9 +330,35 @@ def obtener_solicitudes_tecnico(authorization: str = Header(None)):
         rows = cur.fetchall()
         datos_transformados = [map_solicitud(row) for row in rows]
 
-        return {"data": datos_transformados}
+        return datos_transformados
 
     finally:
         cur.close()
         conn.close()
 
+
+@app.get("/api/HDesk/TipoSolicitud/ObtenerTipoSolicitud")
+def obtener_tipo_solicitud(authorization: str = Header(None)):
+    if not authorization:
+        return {"valid": False}
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        cur.execute("""SELECT id, service_desc FROM servicios ORDER BY "id" ASC""")
+        rows = cur.fetchall()
+
+        data = [
+            {
+                "tipoSolicitudId": row["id"],
+                "tipoSolicitudDesc": row["service_desc"]
+            }
+            for row in rows
+        ]
+
+        return data
+
+    finally:
+        cur.close()
+        conn.close()

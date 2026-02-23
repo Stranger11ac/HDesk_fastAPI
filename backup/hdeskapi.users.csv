@@ -1,0 +1,3 @@
+id,username,password,fullname,role,active
+2,salvadorh,5de71b2143c86cd2e0c801830ed729e7ef2f8f478b454d7d3e9dd5a86a92b255,Salvador Hernandez Cepeda,Super Administrador,t
+3,salvador,5de71b2143c86cd2e0c801830ed729e7ef2f8f478b454d7d3e9dd5a86a92b255,salvador Cepeda,usuario,t

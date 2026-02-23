@@ -237,8 +237,15 @@ def obtener_solicitudes_v2( pagina: int, tamanio: int, Busqueda: str = "", estat
         cur.execute("""
             SELECT COUNT(*) AS total
             FROM solicitudes
-            WHERE
-                (%s IS NULL OR estatus_id = %s)
+            WHERE estatus_id = %s
+        """, (estatus_id,))
+
+        total = cur.fetchone()["total"]
+
+        cur.execute("""
+            SELECT *
+            FROM solicitudes
+            WHERE estatus_id = %s
                 AND (
                     LOWER(estatus_desc) LIKE %s OR
                     LOWER(nombre_empleado_registro) LIKE %s OR
@@ -247,44 +254,8 @@ def obtener_solicitudes_v2( pagina: int, tamanio: int, Busqueda: str = "", estat
                     LOWER(nombre_empleado_atendio) LIKE %s OR
                     LOWER(folio) LIKE %s
                 )
-        """, (estatus_id, estatus_id) + (search,) * 6)
-
-        total = cur.fetchone()["total"]
-
-        if tamanio > 0:
-            cur.execute("""
-                SELECT *
-                FROM solicitudes
-                WHERE
-                    (%s IS NULL OR estatus_id = %s)
-                    AND (
-                        LOWER(estatus_desc) LIKE %s OR
-                        LOWER(nombre_empleado_registro) LIKE %s OR
-                        LOWER(descripcion) LIKE %s OR
-                        LOWER(tipo_solicitud_desc) LIKE %s OR
-                        LOWER(nombre_empleado_atendio) LIKE %s OR
-                        LOWER(folio) LIKE %s
-                    )
-                ORDER BY solicitud_id ASC
-                LIMIT %s OFFSET %s
-            """, (estatus_id, estatus_id) + (search,) * 6 + (tamanio, offset))
-        else:
-            cur.execute("""
-                SELECT *
-                FROM solicitudes
-                WHERE
-                    (%s IS NULL OR estatus_id = %s)
-                    AND (
-                        LOWER(estatus_desc) LIKE %s OR
-                        LOWER(nombre_empleado_registro) LIKE %s OR
-                        LOWER(descripcion) LIKE %s OR
-                        LOWER(tipo_solicitud_desc) LIKE %s OR
-                        LOWER(nombre_empleado_atendio) LIKE %s OR
-                        LOWER(folio) LIKE %s
-                    )
-                ORDER BY solicitud_id ASC
-            """, (estatus_id, estatus_id) + (search,) * 6)
-
+            ORDER BY solicitud_id ASC
+        """, (estatus_id,) + (search,) * 6)
 
         rows = cur.fetchall()
         datos_transformados = [map_solicitud(row) for row in rows]

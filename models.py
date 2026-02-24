@@ -12,3 +12,6 @@ class LoginRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     refreshToken: str
+
+class AceptarSolicitudRequest(BaseModel):
+    solicitudId: int

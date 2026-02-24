@@ -11,7 +11,7 @@ from auth import create_token, get_payload_from_bearer
 from settings import settings
 from database import get_connection
 from functions import map_solicitud
-from models import LogupRequest, LoginRequest, RefreshRequest
+from models import LogupRequest, LoginRequest, RefreshRequest, AceptarSolicitudRequest
 
 app = FastAPI()
 
@@ -353,3 +353,82 @@ def obtiene_solicitud_id( statusid: int, authorization: str = Header(None)):
     finally:
         cur.close()
         conn.close()
+
+
+@app.patch("/api/HDesk/Solicitudes/AceptarSolicitud")
+def aceptar_solicitud(
+    data: AceptarSolicitudRequest,
+    authorization: str = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Token no proporcionado")
+
+    token = authorization.replace("Bearer ", "")
+
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    username = payload.get("Username")
+    if not username:
+        raise HTTPException(status_code=401, detail="Token sin usuario")
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        cur.execute("""
+            SELECT id, fullname
+            FROM users
+            WHERE username = %s
+        """, (username,))
+        user = cur.fetchone()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+        # 🔎 Verificar que exista la solicitud
+        cur.execute("""
+            SELECT solicitud_id
+            FROM solicitudes
+            WHERE solicitud_id = %s
+        """, (data.solicitudId,))
+        solicitud = cur.fetchone()
+
+        if not solicitud:
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+        # ✏️ Actualizar solicitud
+        cur.execute("""
+            UPDATE solicitudes
+            SET 
+                empleado_atendio_id = %s,
+                nombre_empleado_atendio = %s,
+                estatus_id = 3,
+                estatus_desc = 'Aceptada',
+                updated_at = %s
+            WHERE solicitud_id = %s
+        """, (
+            user["id"],
+            user["fullname"],
+            datetime.utcnow(),
+            data.solicitudId
+        ))
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "message": f"Solicitud {data.solicitudId} aceptada correctamente",
+            "empleado": user["fullname"]
+        }
+
+    finally:
+        cur.close()
+        conn.close()
+

@@ -356,10 +356,7 @@ def obtiene_solicitud_id( statusid: int, authorization: str = Header(None)):
 
 
 @app.patch("/api/HDesk/Solicitudes/AceptarSolicitud")
-def aceptar_solicitud(
-    data: AceptarSolicitudRequest,
-    authorization: str = Header(None)
-):
+def aceptar_solicitud(data: AceptarSolicitudRequest, authorization: str = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Token no proporcionado")
 
@@ -432,3 +429,23 @@ def aceptar_solicitud(
         cur.close()
         conn.close()
 
+
+@app.get("/api/HDesk/Dictamen/ObtenerDictamenesPorSolicitud/{statusid}")
+# Modifica este endpoint para obtener uns lista de dictamenes relacionados a la solicitud.
+def obtiene_solicitud_id( statusid: int, authorization: str = Header(None)):
+    if not authorization:
+        return {"valid": False}
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        cur.execute("""SELECT * FROM solicitudes WHERE solicitud_id = %s""", (statusid,))
+        row = cur.fetchone()
+        request = map_solicitud(row)
+
+        return request
+
+    finally:
+        cur.close()
+        conn.close()

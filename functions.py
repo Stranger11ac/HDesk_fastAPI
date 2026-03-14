@@ -53,3 +53,13 @@ def map_status_dictamenes(row: dict) -> dict:
         "estatusActivoId": row["estatusactivoid"],
         "estatusActivoDesc": row["estatusactivodesc"],
     }
+
+def map_dictamen(row: dict) -> dict:
+    return {
+        "cancelado": row["cancelado"],
+        "dictamenId": row["dictamenid"],
+        "fechaHora": row["fechahora"],
+        "consecutivo": {
+            "folio": row["folio"]
+        },
+    }

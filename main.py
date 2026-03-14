@@ -10,7 +10,7 @@ import hashlib
 from auth import create_token, get_payload_from_bearer
 from settings import settings
 from database import get_connection
-from functions import map_solicitud
+from functions import map_solicitud, map_status_dictamenes
 from models import LogupRequest, LoginRequest, RefreshRequest, AceptarSolicitudRequest
 
 app = FastAPI()
@@ -182,9 +182,11 @@ def refresh_token(data: RefreshRequest):
 
 
 @app.get("/api/HDesk/Solicitudes/ObtenerSolicitudes/{pagina}/{tamanio}")
-def obtener_solicitudes( pagina: int, tamanio: int, Busqueda: str = "", authorization: str = Header(None)):
+def obtener_solicitudes(pagina: int, tamanio: int, Busqueda: str = "", authorization: str = Header(None)):
+
     if not authorization:
         return {"valid": False}
+
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -192,29 +194,48 @@ def obtener_solicitudes( pagina: int, tamanio: int, Busqueda: str = "", authoriz
         offset = (pagina - 1) * tamanio
         search = f"%{Busqueda.lower()}%"
 
+        # TOTAL DE SOLICITUDES
         cur.execute(""" SELECT COUNT(*) AS total FROM solicitudes """)
         total = cur.fetchone()["total"]
 
+        # TOTAL FILTRADO
+        cur.execute("""
+            SELECT COUNT(*) AS totalRegistros
+            FROM solicitudes
+            WHERE
+                COALESCE(LOWER(estatus_desc),'') LIKE %s OR
+                COALESCE(LOWER(nombre_empleado_registro),'') LIKE %s OR
+                COALESCE(LOWER(descripcion),'') LIKE %s OR
+                COALESCE(LOWER(tipo_solicitud_desc),'') LIKE %s OR
+                COALESCE(LOWER(nombre_empleado_atendio),'') LIKE %s OR
+                COALESCE(LOWER(folio),'') LIKE %s
+        """, (search,)*6)
+
+        totalRegistros = cur.fetchone()["totalRegistros"]
+
+        # DATOS PAGINADOS
         cur.execute("""
             SELECT *
             FROM solicitudes
             WHERE
-                LOWER(estatus_desc) LIKE %s OR
-                LOWER(nombre_empleado_registro) LIKE %s OR
-                LOWER(descripcion) LIKE %s OR
-                LOWER(tipo_solicitud_desc) LIKE %s OR
-                LOWER(nombre_empleado_atendio) LIKE %s OR
-                LOWER(folio) LIKE %s
+                COALESCE(LOWER(estatus_desc),'') LIKE %s OR
+                COALESCE(LOWER(nombre_empleado_registro),'') LIKE %s OR
+                COALESCE(LOWER(descripcion),'') LIKE %s OR
+                COALESCE(LOWER(tipo_solicitud_desc),'') LIKE %s OR
+                COALESCE(LOWER(nombre_empleado_atendio),'') LIKE %s OR
+                COALESCE(LOWER(folio),'') LIKE %s
             ORDER BY solicitud_id ASC
             LIMIT %s OFFSET %s
         """, (search,)*6 + (tamanio, offset))
 
         rows = cur.fetchall()
+
         datos_transformados = [map_solicitud(row) for row in rows]
 
         return {
             "datos": datos_transformados,
-            "totalRegistros": total
+            "totalSolicitudes": total,
+            "totalRegistros": totalRegistros
         }
 
     finally:
@@ -430,8 +451,27 @@ def aceptar_solicitud(data: AceptarSolicitudRequest, authorization: str = Header
         conn.close()
 
 
+@app.get("/api/HDesk/EstatusActivo/ObtenerEstatusActivo")
+def obtiene_solicitud_id(authorization: str = Header(None)):
+    if not authorization:
+        return {"valid": False}
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        cur.execute("""SELECT * FROM estatusactivo""")
+        row = cur.fetchone()
+        request = map_status_dictamenes(row)
+
+        return request
+
+    finally:
+        cur.close()
+        conn.close()
+
+
 @app.get("/api/HDesk/Dictamen/ObtenerDictamenesPorSolicitud/{statusid}")
-# Modifica este endpoint para obtener uns lista de dictamenes relacionados a la solicitud.
 def obtiene_solicitud_id( statusid: int, authorization: str = Header(None)):
     if not authorization:
         return {"valid": False}
@@ -440,7 +480,7 @@ def obtiene_solicitud_id( statusid: int, authorization: str = Header(None)):
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
-        cur.execute("""SELECT * FROM solicitudes WHERE solicitud_id = %s""", (statusid,))
+        cur.execute("""SELECT * FROM dictamenes WHERE solicitud_id = %s""", (statusid,))
         row = cur.fetchone()
         request = map_solicitud(row)
 

@@ -47,3 +47,9 @@ def map_solicitud(row: dict) -> dict:
         "programada": row["programada"],
         "fechaProgramada": row["fecha_programada"],
     }
+
+def map_status_dictamenes(row: dict) -> dict:
+    return {
+        "estatusActivoId": row["estatusactivoid"],
+        "estatusActivoDesc": row["estatusactivodesc"],
+    }

@@ -182,12 +182,7 @@ def refresh_token(data: RefreshRequest):
 
 
 @app.get("/api/HDesk/Solicitudes/ObtenerSolicitudes/{pagina}/{tamanio}")
-def obtener_solicitudes(
-    pagina: int,
-    tamanio: int,
-    Busqueda: str = "",
-    authorization: str = Header(None)
-):
+def obtener_solicitudes(pagina: int, tamanio: int, Busqueda: str = "", authorization: str = Header(None)):
 
     if not authorization:
         return {"valid": False}
@@ -205,13 +200,8 @@ def obtener_solicitudes(
         """)
         total = cur.fetchone()["total"]
 
-        # ================================
-        # CASO 1: SIN BUSQUEDA
-        # ================================
         if Busqueda == "":
-
             totalRegistros = total
-
             cur.execute("""
                 SELECT *
                 FROM solicitudes
@@ -219,13 +209,8 @@ def obtener_solicitudes(
                 LIMIT %s OFFSET %s
             """, (tamanio, offset))
 
-        # ================================
-        # CASO 2: CON BUSQUEDA
-        # ================================
         else:
-
             search = f"%{Busqueda.lower()}%"
-
             # TOTAL FILTRADO
             cur.execute("""
                 SELECT COUNT(*) AS totalRegistros
@@ -238,7 +223,6 @@ def obtener_solicitudes(
                     COALESCE(LOWER(nombre_empleado_atendio),'') LIKE %s OR
                     COALESCE(LOWER(folio),'') LIKE %s
             """, (search,)*6)
-
             totalRegistros = cur.fetchone()["totalRegistros"]
 
             # DATOS FILTRADOS
@@ -255,9 +239,7 @@ def obtener_solicitudes(
                 ORDER BY solicitud_id ASC
                 LIMIT %s OFFSET %s
             """, (search,)*6 + (tamanio, offset))
-
         rows = cur.fetchall()
-
         datos_transformados = [map_solicitud(row) for row in rows]
 
         return {
@@ -272,7 +254,7 @@ def obtener_solicitudes(
 
 
 @app.get("/api/HDesk/Solicitudes/ObtenerSolicitudesV2/{pagina}/{tamanio}")
-def obtener_solicitudes_v2( pagina: int, tamanio: int, Busqueda: str = "", estatus_id: int = Query(None, alias="filter.EstatusId"), authorization: str = Header(None)):
+def obtener_solicitudes_v2(pagina: int, tamanio: int, Busqueda: str = "", estatus_id: int = Query(None, alias="filter.EstatusId"), authorization: str = Header(None)):
     if not authorization:
         return {"valid": False}
 

@@ -339,6 +339,38 @@ def obtener_solicitudes_tecnico(authorization: str = Header(None)):
         conn.close()
 
 
+@app.get("/api/HDesk/Solicitudes/ObtenerSolicitudesUsuario")
+def obtener_solicitudes_tecnico(authorization: str = Header(None)):
+    payload = get_payload_from_bearer(authorization)
+    username = payload.get("Username")
+    if not username:
+        raise HTTPException(status_code=401, detail="Token missing Username")
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        cur.execute(" SELECT id FROM users WHERE username = %s AND active = true ", (username,))
+        user = cur.fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user_id = user["id"]
+        cur.execute("""
+            SELECT *
+            FROM solicitudes
+            WHERE empleado_atendio_id = %s
+        """, (user_id,))
+
+        rows = cur.fetchall()
+        datos_transformados = [map_solicitud(row) for row in rows]
+        return datos_transformados
+
+    finally:
+        cur.close()
+        conn.close()
+
+
 @app.get("/api/HDesk/TipoSolicitud/ObtenerTipoSolicitud")
 def obtener_tipo_solicitud(authorization: str = Header(None)):
     if not authorization:

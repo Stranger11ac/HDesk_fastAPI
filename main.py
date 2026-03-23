@@ -51,47 +51,60 @@ def login(data: LogupRequest):
 
 @app.post("/api/SIIGAA/Auth/Token")
 def login(data: LoginRequest):
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        hashed = hashlib.sha256(data.contraseña.encode()).hexdigest()
 
-    hashed = hashlib.sha256(data.contraseña.encode()).hexdigest()
+        cur.execute("""
+            SELECT id, username, fullname, role
+            FROM users
+            WHERE username=%s AND password=%s AND active=true
+        """, (data.usuario, hashed))
+        user = cur.fetchone()
 
-    cur.execute("""
-        SELECT id, username, fullname, role
-        FROM users
-        WHERE username=%s AND password=%s AND active=true
-    """, (data.usuario, hashed))
+        if not user:
+            return JSONResponse(status_code=401, content={"message": f"Credenciales inválidas. No se encontró al usuario '{data.usuario}'."})
 
-    user = cur.fetchone()
-    if not user:
-        return JSONResponse(status_code=401, detail="Credenciales inválidas")
+        payload = {
+            "Username": user["username"],
+            "nameid": user["fullname"],
+            "role": user["role"],
+            "type": "access"
+        }
+        token = create_token(payload, ACCESS_MINUTES)
+        refresh = create_token(payload, REFRESH_MINUTES)
 
-    payload = {
-        "Username": user["username"],
-        "nameid": user["fullname"],
-        "role": user["role"],
-        "type": "access"
-    }
-    token = create_token(payload, ACCESS_MINUTES)
-    refresh = create_token(payload, REFRESH_MINUTES)
+        cur.execute("""
+            INSERT INTO refresh_tokens (user_id, token, expires_at)
+            VALUES (%s, %s, %s)
+        """, (
+            user["id"],
+            refresh,
+            datetime.utcnow() + timedelta(minutes=REFRESH_MINUTES)
+        ))
 
-    cur.execute("""
-        INSERT INTO refresh_tokens (user_id, token, expires_at)
-        VALUES (%s, %s, %s)
-    """, (
-        user["id"],
-        refresh,
-        datetime.utcnow() + timedelta(minutes=REFRESH_MINUTES)
-    ))
+        conn.commit()
 
-    conn.commit()
-    cur.close()
-    conn.close()
+        return {
+            "token": token,
+            "refreshToken": refresh
+        }
 
-    return {
-        "token": token,
-        "refreshToken": refresh
-    }
+    except Exception as e:
+        print("ERROR LOGIN:", str(e))  # útil en consola
+
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Error interno del servidor"}
+        )
+
+    finally:
+        try:
+            cur.close()
+            conn.close()
+        except:
+            pass
 
 
 @app.get("/api/SIIGAA/Auth/CheckToken")

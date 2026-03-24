@@ -337,8 +337,7 @@ def obtener_solicitudes_tecnico(authorization: str = Header(None)):
         cur.execute("""
             SELECT *
             FROM solicitudes
-            WHERE estatus_id = 3
-              AND empleado_atendio_id = %s
+            WHERE empleado_atendio_id = %s
             ORDER BY solicitud_id ASC
         """, (user_id,))
 
@@ -372,7 +371,7 @@ def obtener_solicitudes_tecnico(authorization: str = Header(None)):
         cur.execute("""
             SELECT *
             FROM solicitudes
-            WHERE empleado_atendio_id = %s
+            WHERE nombre_empleado_registro = %s
         """, (user_id,))
 
         rows = cur.fetchall()

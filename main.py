@@ -392,13 +392,14 @@ def obtener_tipo_solicitud(authorization: str = Header(None)):
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
-        cur.execute("""SELECT id, service_desc FROM servicios ORDER BY "id" ASC""")
+        cur.execute("""SELECT * FROM servicios ORDER BY "id" ASC""")
         rows = cur.fetchall()
 
         data = [
             {
                 "tipoSolicitudId": row["id"],
-                "tipoSolicitudDesc": row["service_desc"]
+                "tipoSolicitudDesc": row["service_name"],
+                "descripcion": row["service_desc"]
             }
             for row in rows
         ]

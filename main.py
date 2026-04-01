@@ -611,3 +611,65 @@ def obtiene_solicitud_id( statusid: int, authorization: str = Header(None)):
     finally:
         cur.close()
         conn.close()
+
+
+@app.get("/api/HDesk/Labs/ObtenerUbicaciones")
+def obtiene_solicitud_id( authorization: str = Header(None)):
+    if not authorization:
+        return {"valid": False}
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        cur.execute("""SELECT * FROM ubicaciones""")
+        rows = cur.fetchall()
+        return rows
+
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/api/HDesk/Labs/ObtenerLaboratorio/{ubicacionId}")
+def obtiene_solicitud_id(ubicacionId: int, authorization: str = Header(None)):
+    if not authorization:
+        return {"valid": False}
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        if not ubicacionId:
+            cur.execute("""SELECT * FROM laboratorios""")
+        else:
+            cur.execute("""SELECT * FROM laboratorios WHERE UbicacionId = %s""", (ubicacionId,))
+        
+        rows = cur.fetchall()
+        return rows
+
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/api/HDesk/Labs/ObtenerEquiposLaboratorio/{LabId}")
+def obtiene_solicitud_id(LabId: int, authorization: str = Header(None)):
+    if not authorization:
+        return {"valid": False}
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        if not LabId:
+            cur.execute("""SELECT * FROM equiposlaboratorio""")
+        else:
+            cur.execute("""SELECT * FROM equiposlaboratorio WHERE LabId = %s""", (LabId,))
+        
+        rows = cur.fetchall()
+        return rows
+
+    finally:
+        cur.close()
+        conn.close()

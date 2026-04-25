@@ -1,4 +1,5 @@
 FROM python:3.11-slim
+WORKDIR /app
 
 # Copia primero dependencias (cache)
 COPY main.txt .

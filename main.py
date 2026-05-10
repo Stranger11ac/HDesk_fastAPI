@@ -371,7 +371,7 @@ def obtener_solicitudes_tecnico(authorization: str = Header(None)):
         cur.execute("""
             SELECT *
             FROM solicitudes
-            WHERE nombre_empleado_registro = %s
+            WHERE empleado_registro_id = %s
         """, (user_id,))
 
         rows = cur.fetchall()
